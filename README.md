@@ -1,81 +1,82 @@
-[![Aurelio AI](https://pbs.twimg.com/profile_banners/1671498317455581184/1696285195/1500x500)](https://aurelio.ai)
+# Chunker Visualization App
 
-# Semantic Chunkers
+---
+❗❗❗ Данный репозиторий - это форк репозитория [aurelio-labs/semantic-chunkers](https://github.com/aurelio-labs/semantic-chunkers) и использует реализованные в нем классы с незначительными изменениями.
+---
 
-<p>
-<img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/semantic-chunkers?logo=python&logoColor=gold" />
-<img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/aurelio-labs/semantic-chunkers" />
-<img alt="GitHub Last Commit" src="https://img.shields.io/github/last-commit/aurelio-labs/semantic-chunkers" />
-<img alt="" src="https://img.shields.io/github/repo-size/aurelio-labs/semantic-chunkers" />
-<img alt="GitHub Issues" src="https://img.shields.io/github/issues/aurelio-labs/semantic-chunkers" />
-<img alt="GitHub Pull Requests" src="https://img.shields.io/github/issues-pr/aurelio-labs/semantic-chunkers" />
-<img src="https://codecov.io/gh/aurelio-labs/semantic-chunkers/graph/badge.svg?token=H8OOMV2TUF" />
-<img alt="Github License" src="https://img.shields.io/badge/License-MIT-yellow.svg" />
-</p>
+Это интерактивное приложение на Streamlit для визуализации работы различных алгоритмов семантического разбиения текста на чанки (chunking).  
+Вы можете ввести свой текст, выбрать один из трёх чанкеров и пошагово увидеть, как именно происходит разбиение.
 
-Semantic Chunkers is a multi-modal chunking library for intelligent chunking of text, video, and audio. It makes your AI and data processing more efficient _and_ accurate.
+## Быстрый старт
+
+1. Установите зависимости:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Запустите приложение:
+   ```bash
+   streamlit run app.py
+   ```
+3. Откройте браузер по адресу, который покажет Streamlit (обычно http://localhost:8501).
 
 ---
 
-## 📚 Resources
+## Описание методов
 
-### Docs
+### 1. StatisticalChunker
 
-| Notebook | Description |
-| -------- | ----------- |
-| [Introduction](https://github.com/aurelio-labs/semantic-chunkers/blob/main/docs/01-video-chunking.ipynb) | Chunking videos with semantics |
+**Кратко:**  
+Статистический чанкер использует окно (window) для анализа нескольких предыдущих частей текста и вычисляет семантическое сходство между ними.  
+Он может автоматически подбирать оптимальный порог для разбиения (dynamic threshold) и позволяет задавать минимальный и максимальный размер чанка в токенах.
 
-# StatisticalChunker Visualization
+**Особенности:**
+- Сравнивает не только соседние, но и несколько предыдущих сплитов (окно).
+- Может использовать динамический или фиксированный порог схожести.
+- Позволяет контролировать размер чанков.
+- Хорошо подходит для сложных текстов, где границы смысловых блоков неочевидны.
 
-This application provides a visual interface for understanding how the StatisticalChunker works. It allows you to input text and see how it gets split into sentences and then chunked based on semantic similarity.
+---
 
-## Features
+### 2. ConsecutiveChunker
 
-- Interactive text input
-- Adjustable chunking parameters
-- Visualization of similarity scores between sentences
-- Visualization of chunk sizes
-- Detailed statistics about the chunking process
-- Expandable view of each generated chunk
+**Кратко:**  
+Этот чанкер сравнивает только соседние части текста (i-й и i+1-й сплит) по их семантическому сходству.  
+Если схожесть ниже заданного порога, начинается новый чанк.
 
-## Installation
+**Особенности:**
+- Очень простой и быстрый.
+- Хорошо работает, если в тексте есть чёткие смысловые границы.
+- Не учитывает более широкий контекст, только пары соседних сплитов.
 
-1. Clone this repository
-2. Install the required dependencies:
-```bash
-pip install -r requirements.txt
-```
+---
 
-## Usage
+### 3. CumulativeChunker
 
-1. Set your OpenAI API key as an environment variable:
-```bash
-export OPENAI_API_KEY='your-api-key-here'
-```
+**Кратко:**  
+В этом методе для каждого шага берётся весь накопленный текст текущего чанка и сравнивается с очередным новым сплитом.  
+Если схожесть падает ниже порога, начинается новый чанк.
 
-2. Run the Streamlit application:
-```bash
-streamlit run app.py
-```
+**Особенности:**
+- Сохраняет широкий контекст: сравнивает не только с последним, а со всем предыдущим чанком.
+- Позволяет формировать более связные и логичные чанки, особенно для длинных текстов.
+- Хорошо подходит для задач, где важно не терять общий смысл и связность.
 
-3. Open your web browser and navigate to the URL shown in the terminal (usually http://localhost:8501)
+---
 
-4. Enter your text in the text area and adjust the chunking parameters if needed
+## Визуализация
 
-5. Click "Create Chunks" to see the visualization and results
+Для каждого метода реализована пошаговая визуализация:
+- **StatisticalChunker:** показывает процесс разбиения с учётом окна, динамического порога и финальные чанки.
+- **ConsecutiveChunker:** визуализирует сравнение соседних частей и итоговые чанки.
+- **CumulativeChunker:** наглядно показывает, как накапливается текст для сравнения, и как формируются чанки.
 
-## Parameters
+---
 
-- **Window Size**: Number of previous sentences to consider when calculating similarity scores
-- **Minimum Tokens per Chunk**: Minimum number of tokens that should be in each chunk
+## Пример использования
 
-## Visualization
+1. Введите текст в поле.
+2. Выберите нужный чанкер в меню слева.
+3. Переключайтесь по шагам, чтобы увидеть, как работает выбранный алгоритм.
 
-The application shows two main visualizations:
-
-1. **Similarity Scores**: A line plot showing the similarity scores between consecutive sentences
-2. **Chunk Sizes**: A bar plot showing how many sentences are in each chunk
-
-Additionally, you can expand each chunk to see its contents and the similarity score that triggered its creation.
-
+---
 
