@@ -234,26 +234,48 @@ def visualize_cumulative_step(
     # Step 2: Show cumulative text building
     elif step == 2:
         splits = chunker._split(text)
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(12, 8))
         ax.axis('off')
         
-        # Show how text accumulates
-        cumulative_texts = []
+        # Create a text display showing accumulation
+        y_pos = 0.95
         for i in range(len(splits)):
+            # Show current step number
+            ax.text(0.1, y_pos, f"Step {i+1}:", fontsize=12, weight='bold')
+            y_pos -= 0.05
+            
+            # Show cumulative text with color highlighting
             if i == 0:
-                cumulative_texts.append(splits[0])
+                # First split is shown in blue
+                ax.text(0.15, y_pos, splits[0], 
+                       color='blue', wrap=True, fontsize=10)
             else:
-                cumulative_texts.append("\n".join(splits[:i+1]))
-        
-        text_to_show = "Cumulative text building process:\n\n"
-        for i, cum_text in enumerate(cumulative_texts):
-            text_to_show += f"Step {i+1} - Comparing with next split:\n"
-            text_to_show += f"Cumulative text: {cum_text[:100]}...\n"
+                # Show previous splits in gray
+                prev_text = "\n".join(splits[:i])
+                ax.text(0.15, y_pos, prev_text, 
+                       color='gray', wrap=True, fontsize=10)
+                y_pos -= 0.02
+                # Show current split in blue
+                ax.text(0.15, y_pos, splits[i], 
+                       color='blue', wrap=True, fontsize=10)
+            
+            y_pos -= 0.05
+            
+            # Show next split if exists
             if i < len(splits) - 1:
-                text_to_show += f"Next split: {splits[i+1][:100]}...\n"
-            text_to_show += "\n"
+                ax.text(0.15, y_pos, "Comparing with next split:", 
+                       color='red', wrap=True, fontsize=10)
+                y_pos -= 0.02
+                ax.text(0.15, y_pos, splits[i+1], 
+                       color='red', wrap=True, fontsize=10)
+            
+            y_pos -= 0.1  # Add space between steps
         
-        ax.text(0.1, 0.5, text_to_show, wrap=True, fontsize=10)
+        # Add legend
+        ax.text(0.1, 0.02, 
+                "Legend:\nBlue = Current cumulative text\nGray = Previous text\nRed = Next split to compare with",
+                fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
+        
         return fig, splits, [], []
     
     # Step 3: Calculate and show similarities
@@ -547,41 +569,64 @@ def main():
             st.text(f"Step {current_step}/4")
         
         # Show current step visualization
-        with st.spinner("Processing..."):
-            fig, splits, similarities, split_indices = visualize_cumulative_step(
-                text, chunker, current_step
-            )
-            st.pyplot(fig)
-            
-            # Show additional information based on current step
-            if current_step == 1:
-                st.write("Initial splits of the text:")
-                for i, split in enumerate(splits):
-                    st.text(f"Split {i+1}: {split}")
-            
-            elif current_step == 2:
-                st.write("""
-                **Key difference from other chunkers:**
-                - Unlike ConsecutiveChunker which compares adjacent splits
-                - Unlike StatisticalChunker which uses a sliding window
-                - CumulativeChunker compares the entire accumulated text with the next split
-                - This helps maintain context and coherence across larger chunks
-                """)
-            
-            elif current_step == 3:
-                st.write("Similarity scores between cumulative text and next split:")
-                df = pd.DataFrame({
-                    'Split Index': range(1, len(similarities) + 1),
-                    'Similarity Score': similarities
-                })
-                st.dataframe(df)
-            
-            elif current_step == 4:
-                st.write("Final chunks:")
-                chunks = chunker._chunk(splits)
-                for i, chunk in enumerate(chunks):
-                    with st.expander(f"Chunk {i+1} (Score: {chunk.triggered_score if chunk.triggered_score else 'N/A'})"):
-                        st.write(" ".join(chunk.splits))
+        if current_step == 2:
+            st.info("На этом шаге происходит подготовка к сравнению: текст разбит на сплиты, далее будет происходить накопление для сравнения.")
+        elif current_step == 3:
+            splits = chunker._split(text)
+            st.subheader("Визуализация накопления текста и сравнения на каждом шаге")
+            similarities = []
+            curr_chunk_start_idx = 0
+            for idx in range(len(splits) - 1):
+                if idx == 0:
+                    curr_chunk_docs = splits[idx]
+                else:
+                    curr_chunk_docs = "\n".join(splits[curr_chunk_start_idx : idx + 1])
+                next_doc = splits[idx + 1]
+                curr_chunk_docs_embed = chunker.encoder([curr_chunk_docs])[0]
+                next_doc_embed = chunker.encoder([next_doc])[0]
+                curr_sim_score = np.dot(curr_chunk_docs_embed, next_doc_embed) / (
+                    np.linalg.norm(curr_chunk_docs_embed) * np.linalg.norm(next_doc_embed)
+                )
+                similarities.append(curr_sim_score)
+                # Визуализация накопления
+                st.markdown(f"**Шаг {idx+1}:**")
+                html = ""
+                if curr_chunk_start_idx < idx:
+                    html += f"<span style='color:gray'>{'<br>'.join(splits[curr_chunk_start_idx:idx])}<br></span>"
+                html += f"<span style='color:blue'>{splits[idx]}</span>"
+                html += "<br><span style='color:red'>Следующий сплит:<br>"
+                html += splits[idx+1] + "</span>"
+                st.markdown(html, unsafe_allow_html=True)
+                st.markdown(f"**Similarity:** {curr_sim_score:.3f}")
+                st.markdown("---")
+                # Если был разрыв, обновляем curr_chunk_start_idx
+                if curr_sim_score < chunker.score_threshold:
+                    curr_chunk_start_idx = idx + 1
+            st.info("Серым — предыдущий текст в чанке, синим — текущий кумулятивный, красным — следующий сплит для сравнения.")
+            # Таблица similarity
+            st.write("Similarity scores between cumulative text and next split:")
+            df = pd.DataFrame({
+                'Step': range(1, len(similarities) + 1),
+                'Similarity Score': similarities
+            })
+            st.dataframe(df)
+        else:
+            with st.spinner("Processing..."):
+                fig, splits, similarities, split_indices = visualize_cumulative_step(
+                    text, chunker, current_step
+                )
+                st.pyplot(fig)
+                # Show additional information based on current step
+                if current_step == 1:
+                    st.write("Initial splits of the text:")
+                    for i, split in enumerate(splits):
+                        st.text(f"Split {i+1}: {split}")
+                elif current_step == 4:
+                    st.write("Final chunks:")
+                    chunks = chunker._chunk(splits)
+                    for i, chunk in enumerate(chunks):
+                        with st.expander(f"Chunk {i+1} (Score: {chunk.triggered_score if chunk.triggered_score else 'N/A'})"):
+                            st.write(" ".join(chunk.splits))
 
 if __name__ == "__main__":
     main()
