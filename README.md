@@ -1,7 +1,9 @@
 # Chunker Visualization App
 
 ---
+
 ❗❗❗ Данный репозиторий - это форк репозитория [aurelio-labs/semantic-chunkers](https://github.com/aurelio-labs/semantic-chunkers) и использует реализованные в нем классы с незначительными изменениями.
+
 ---
 
 Это интерактивное приложение на Streamlit для визуализации работы различных алгоритмов семантического разбиения текста на чанки (chunking).  
