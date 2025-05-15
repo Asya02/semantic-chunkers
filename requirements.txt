@@ -4,5 +4,5 @@ matplotlib>=3.7.0
 nltk>=3.8.1
 semantic-router>=0.0.1
 semantic-chunkers>=0.0.1
-openai>=1.0.0
 pandas>=2.0.0 
+langchain_gigachat
