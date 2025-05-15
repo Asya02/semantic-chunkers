@@ -10,6 +10,7 @@ from nltk.tokenize import sent_tokenize
 # from semantic_router.encoders import OpenAIEncoder
 from giga_encoder import GigaChatEncoder
 from semantic_chunkers.chunkers.consecutive import ConsecutiveChunker
+from semantic_chunkers.chunkers.cumulative import CumulativeChunker
 from semantic_chunkers.chunkers.statistical import StatisticalChunker
 
 # Download required NLTK data
@@ -214,13 +215,110 @@ def visualize_statistical_step(
         
         return fig, splits, [], []
 
+def visualize_cumulative_step(
+    text: str,
+    chunker: CumulativeChunker,
+    step: int,
+    batch_size: int = 64
+) -> Tuple[plt.Figure, List[str], List[float], List[int]]:
+    """Visualize a specific step of the cumulative chunking process."""
+    # Step 1: Initial split using chunker's splitter
+    if step == 1:
+        splits = chunker._split(text)
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.axis('off')
+        ax.text(0.1, 0.5, f"Initial splits ({len(splits)}):\n\n" + "\n".join(splits), 
+                wrap=True, fontsize=10)
+        return fig, splits, [], []
+    
+    # Step 2: Show cumulative text building
+    elif step == 2:
+        splits = chunker._split(text)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.axis('off')
+        
+        # Show how text accumulates
+        cumulative_texts = []
+        for i in range(len(splits)):
+            if i == 0:
+                cumulative_texts.append(splits[0])
+            else:
+                cumulative_texts.append("\n".join(splits[:i+1]))
+        
+        text_to_show = "Cumulative text building process:\n\n"
+        for i, cum_text in enumerate(cumulative_texts):
+            text_to_show += f"Step {i+1} - Comparing with next split:\n"
+            text_to_show += f"Cumulative text: {cum_text[:100]}...\n"
+            if i < len(splits) - 1:
+                text_to_show += f"Next split: {splits[i+1][:100]}...\n"
+            text_to_show += "\n"
+        
+        ax.text(0.1, 0.5, text_to_show, wrap=True, fontsize=10)
+        return fig, splits, [], []
+    
+    # Step 3: Calculate and show similarities
+    elif step == 3:
+        splits = chunker._split(text)
+        similarities = []
+        
+        for idx in range(len(splits) - 1):
+            if idx == 0:
+                curr_chunk_docs = splits[idx]
+            else:
+                curr_chunk_docs = "\n".join(splits[:idx+1])
+            next_doc = splits[idx + 1]
+            
+            curr_chunk_docs_embed = chunker.encoder([curr_chunk_docs])[0]
+            next_doc_embed = chunker.encoder([next_doc])[0]
+            curr_sim_score = np.dot(curr_chunk_docs_embed, next_doc_embed) / (
+                np.linalg.norm(curr_chunk_docs_embed) * np.linalg.norm(next_doc_embed)
+            )
+            similarities.append(curr_sim_score)
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(similarities, marker='o', linestyle='-', color='b')
+        ax.axhline(y=chunker.score_threshold, color='r', linestyle='--', 
+                  label=f'Threshold: {chunker.score_threshold:.2f}')
+        ax.set_title('Similarity Scores Between Cumulative Text and Next Split')
+        ax.set_xlabel('Split Index')
+        ax.set_ylabel('Similarity Score')
+        ax.grid(True)
+        ax.legend()
+        
+        # Add similarity scores as text
+        for i, score in enumerate(similarities):
+            ax.text(i, score, f'{score:.2f}', ha='center', va='bottom')
+        
+        return fig, splits, similarities, []
+    
+    # Step 4: Final chunks
+    else:
+        splits = chunker._split(text)
+        chunks = chunker._chunk(splits)
+        
+        # Create visualization of chunks
+        fig, ax = plt.subplots(figsize=(12, 6))
+        chunk_sizes = [len(chunk.splits) for chunk in chunks]
+        ax.bar(range(len(chunk_sizes)), chunk_sizes, color='lightblue')
+        ax.set_title('Final Chunks')
+        ax.set_xlabel('Chunk Index')
+        ax.set_ylabel('Number of Splits')
+        ax.grid(True)
+        
+        # Add chunk sizes as text
+        for i, size in enumerate(chunk_sizes):
+            ax.text(i, size, str(size), ha='center', va='bottom')
+        
+        return fig, splits, [], []
+
 def main():
     st.title("Chunker Visualization")
     
     # Sidebar for navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Choose a chunker:", 
-                           ["Statistical Chunker", "Consecutive Chunker"])
+                           ["Statistical Chunker", "Consecutive Chunker", 
+                            "Cumulative Chunker"])
     
     # Text input
     text = st.text_area(
@@ -336,7 +434,7 @@ def main():
                     st.subheader("Chunking Statistics")
                     st.text(str(chunker.statistics))
     
-    else:  # Consecutive Chunker
+    elif page == "Consecutive Chunker":
         st.header("Consecutive Chunker")
         
         # Initialize the encoder and chunker
@@ -393,6 +491,85 @@ def main():
             
             elif current_step == 3:
                 st.write("Similarity scores between consecutive splits:")
+                df = pd.DataFrame({
+                    'Split Index': range(1, len(similarities) + 1),
+                    'Similarity Score': similarities
+                })
+                st.dataframe(df)
+            
+            elif current_step == 4:
+                st.write("Final chunks:")
+                chunks = chunker._chunk(splits)
+                for i, chunk in enumerate(chunks):
+                    with st.expander(f"Chunk {i+1} (Score: {chunk.triggered_score if chunk.triggered_score else 'N/A'})"):
+                        st.write(" ".join(chunk.splits))
+    
+    else:  # Cumulative Chunker
+        st.header("Cumulative Chunker")
+        
+        # Initialize the encoder and chunker
+        with st.spinner("Initializing encoder..."):
+            encoder = GigaChatEncoder()
+            chunker = CumulativeChunker(
+                encoder=encoder,
+                score_threshold=0.45
+            )
+        
+        # Chunker parameters
+        st.subheader("Chunker Parameters")
+        score_threshold = st.slider(
+            "Score Threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.45,
+            step=0.01,
+            help="Similarity threshold for splitting chunks"
+        )
+        
+        # Update chunker parameters
+        chunker.score_threshold = score_threshold
+        
+        # Step navigation
+        st.subheader("Chunking Process")
+        current_step = st.session_state.get('cumulative_step', 1)
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Previous Step") and current_step > 1:
+                current_step -= 1
+                st.session_state.cumulative_step = current_step
+            if st.button("Next Step") and current_step < 4:
+                current_step += 1
+                st.session_state.cumulative_step = current_step
+        
+        with col2:
+            st.progress(current_step / 4)
+            st.text(f"Step {current_step}/4")
+        
+        # Show current step visualization
+        with st.spinner("Processing..."):
+            fig, splits, similarities, split_indices = visualize_cumulative_step(
+                text, chunker, current_step
+            )
+            st.pyplot(fig)
+            
+            # Show additional information based on current step
+            if current_step == 1:
+                st.write("Initial splits of the text:")
+                for i, split in enumerate(splits):
+                    st.text(f"Split {i+1}: {split}")
+            
+            elif current_step == 2:
+                st.write("""
+                **Key difference from other chunkers:**
+                - Unlike ConsecutiveChunker which compares adjacent splits
+                - Unlike StatisticalChunker which uses a sliding window
+                - CumulativeChunker compares the entire accumulated text with the next split
+                - This helps maintain context and coherence across larger chunks
+                """)
+            
+            elif current_step == 3:
+                st.write("Similarity scores between cumulative text and next split:")
                 df = pd.DataFrame({
                     'Split Index': range(1, len(similarities) + 1),
                     'Similarity Score': similarities
