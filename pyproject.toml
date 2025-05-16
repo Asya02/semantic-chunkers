@@ -24,7 +24,7 @@ dependencies = [
     "regex>=2023.12.25,<2024.0.0",
     "tiktoken>=0.7.0,<1.0.0",
     "requests-mock>=1.12.1,<2.0.0",
-    "semantic-router>=0.1.0.dev2"
+    "semantic-router==0.0.68"
 ]
 
 [tool.poetry.extras]
