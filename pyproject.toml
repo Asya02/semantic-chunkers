@@ -7,7 +7,24 @@ readme = "README.md"
 packages = [{include = "semantic_chunkers"}]
 
 [project]
+name = "semantic-chunkers"
+version = "0.1.0.dev1"
+description = "Super advanced chunking methods for AI"
+authors = ["Aurelio AI <hello@aurelio.ai>"]
+readme = "README.md"
 license = {file = "LICENSE"}
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "pydantic>=2.5.3,<3.0.0",
+    "numpy>=1.26.0,<2.0.0",
+    "colorlog>=6.8.0,<7.0.0",
+    "colorama>=0.4.6,<0.5.0",
+    "regex>=2023.12.25,<2024.0.0",
+    "tiktoken>=0.7.0,<1.0.0",
+    "requests-mock>=1.12.1,<2.0.0",
+    "semantic-router>=0.1.0.dev2"
+]
+
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
